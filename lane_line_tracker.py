@@ -6,7 +6,7 @@ import glob
 import pickle
 
 class Lane_Line_Tracker():
-    def __init__(self):
+    def __init__(self,nx=9,ny=6,ksize=9):
         # was the line detected in the last iteration?
         self.detected = False  
         # x values of the last n fits of the line
@@ -32,9 +32,9 @@ class Lane_Line_Tracker():
         dist_pickle = pickle.load( open( "camera_cal/wide_dist_pickle.p", "rb" ) )
         self.mtx = dist_pickle["mtx"]
         self.dist = dist_pickle["dist"]
-        self.nx = 9 # the number of inside corners in x
-        self.ny = 6 # the number of inside corners in y
-        self.ksize = 9
+        self.nx = nx # the number of inside corners in x
+        self.ny = ny # the number of inside corners in y
+        self.ksize = ksize
 
     def calibrate(self):
         # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
@@ -210,16 +210,16 @@ class Lane_Line_Tracker():
         # Use the OpenCV undistort() function to remove distortion
         undist = cv2.undistort(img, mtx, dist, None, mtx)
         # Threshold x gradient
-        gradx = self.abs_sobel_thresh(img, orient='x', sobel_kernel=self.ksize, thresh=(20, 255))
+        gradx = self.abs_sobel_thresh(undist, orient='x', sobel_kernel=self.ksize, thresh=(20, 255))
         # Threshold y gradient
-        grady = self.abs_sobel_thresh(img, orient='y', sobel_kernel=self.ksize, thresh=(20, 255))
+        grady = self.abs_sobel_thresh(undist, orient='y', sobel_kernel=self.ksize, thresh=(20, 255))
         # Threshold color channel
-        color_binary = self.color_threshold(img, S_thresh=(100, 255), V_thresh=(100, 255))
+        color_binary = self.color_threshold(undist, S_thresh=(100, 255), V_thresh=(100, 255))
         # Combine the binary thresholds
-        pre_process_image = np.zeros_like(img[:,:,0])
+        pre_process_image = np.zeros_like(undist[:,:,0])
         pre_process_image[((gradx == 1) & (grady == 1)| color_binary == 1)] = 255
         
-        result, perspective_M = self.perspective_transform(pre_process_image, nx, ny, mtx, dist, height_pct=.62, bias=.10,bottom_trim=.935)
+        result, perspective_M = self.perspective_transform(pre_process_image, self.nx, self.ny, mtx, dist, height_pct=.62, bias=.10,bottom_trim=.935)
         
         return result
 
@@ -314,7 +314,7 @@ class Lane_Line_Tracker():
         cv2.fillPoly(window_img, np.int_([line_pts]), (0,255, 0))
         result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
         
-        road_warped, perspective_M = self.perspective_transform(result, nx, ny, mtx, dist, warp=False)
+        road_warped, perspective_M = self.perspective_transform(result, self.nx, self.ny, self.mtx, self.dist, warp=False)
         result = cv2.addWeighted(image, 1, road_warped, 0.9, 0)
 
         # Define conversions in x and y from pixels space to meters
