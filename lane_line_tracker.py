@@ -34,6 +34,7 @@ class Lane_Line_Tracker():
         self.dist = dist_pickle["dist"]
         self.nx = 9 # the number of inside corners in x
         self.ny = 6 # the number of inside corners in y
+        self.ksize = 9
 
     def calibrate(self):
         # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
@@ -72,7 +73,7 @@ class Lane_Line_Tracker():
         img_size = (img.shape[1], img.shape[0])
 
         # Do camera calibration given object points and image points
-        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_size,None,None)
+        ret, self.mtx, self.dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_size,None,None)
 
 
         dst = cv2.undistort(img, mtx, dist, None, mtx)
@@ -206,13 +207,12 @@ class Lane_Line_Tracker():
 
     def warp(self, img, mtx, dist, nx, ny, s_thresh=(170, 255), sx_thresh=(20, 100)):
         img = np.copy(img)
-        ksize = 9
         # Use the OpenCV undistort() function to remove distortion
         undist = cv2.undistort(img, mtx, dist, None, mtx)
         # Threshold x gradient
-        gradx = self.abs_sobel_thresh(img, orient='x', sobel_kernel=ksize, thresh=(20, 255))
+        gradx = self.abs_sobel_thresh(img, orient='x', sobel_kernel=self.ksize, thresh=(20, 255))
         # Threshold y gradient
-        grady = self.abs_sobel_thresh(img, orient='y', sobel_kernel=ksize, thresh=(20, 255))
+        grady = self.abs_sobel_thresh(img, orient='y', sobel_kernel=self.ksize, thresh=(20, 255))
         # Threshold color channel
         color_binary = self.color_threshold(img, S_thresh=(100, 255), V_thresh=(100, 255))
         # Combine the binary thresholds
@@ -226,15 +226,7 @@ class Lane_Line_Tracker():
     def process_image(self,image):
         """
         """
-        # Read in the saved camera matrix and distortion coefficients
-        # These are the arrays you calculated using cv2.calibrateCamera()
-        dist_pickle = pickle.load( open( "camera_cal/wide_dist_pickle.p", "rb" ) )
-        mtx = dist_pickle["mtx"]
-        dist = dist_pickle["dist"]
-        nx = 9 # the number of inside corners in x
-        ny = 6 # the number of inside corners in y
-
-        binary_warped= self.warp(image,mtx, dist, nx, ny)
+        binary_warped= self.warp(image,self.mtx, self.dist, self.nx, self.ny)
 
         # Assuming you have created a warped binary image called "binary_warped"
         # Take a histogram of the bottom half of the image
@@ -348,7 +340,7 @@ class Lane_Line_Tracker():
         cv2.putText(result, 'Vehicle is '+str(round(center_diff,3))+'(m) '+side_pos+' of center',(50,100), cv2.FONT_HERSHEY_SIMPLEX,2,(255,255,255),3)
         return result
 
-    def process_fit_image(self, binary_warped, left_fit, margin=100):
+    def process_fit_image(self, binary_warped, left_fit, right_fit, margin=100):
         # Assume you now have a new warped binary image 
         # from the next frame of video (also called "binary_warped")
         # It's now much easier to find line pixels!
